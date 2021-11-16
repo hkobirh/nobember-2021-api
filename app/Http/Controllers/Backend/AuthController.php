@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Backend;
 
 use App\Http\Controllers\Controller;
+use http\Env\Response;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -10,7 +11,7 @@ use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 use Exception;
 
-class UserController extends Controller
+class AuthController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -53,7 +54,7 @@ class UserController extends Controller
                 'email'    => $request->email,
                 'password' => Hash::make($request->password),
             ]);
-            return success_message($user->only('name','email'),__('message.user.create.success'),201);
+            return success_message($user->only('name', 'email'), __('message.user.create.success'), 201);
 
         } catch (Exception $e) {
             return error_message(__('message.user.create.error'));
@@ -68,8 +69,8 @@ class UserController extends Controller
      */
     public function show($id)
     {
-        $user = User::select('id','name','email')->first($id);
-        return $user ? success_message($user->only('name','email')):error_message(__('message.user.manage.not_found'));
+        $user = User::select('id', 'name', 'email')->first($id);
+        return $user ? success_message($user->only('name', 'email')) : error_message(__('message.user.manage.not_found'));
     }
 
     /**
@@ -117,14 +118,57 @@ class UserController extends Controller
     }
 
     /**
+     * User login function here
+     *
+     * @param Request $request
+     * @return JsonResponse|void
+     */
+    public function login(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'email'    => 'required',
+            'password' => 'required'
+        ]);
+
+        if ($validator->fails()) return error_message($validator->errors());
+
+        $credentials = $request->only('email', 'password');
+
+        if ($token = auth()->attempt($credentials)) {
+            return response()->json([
+                'token' => $token,
+                'user'  => [
+                    'name'  => auth()->user()->name,
+                    'email' => auth()->user()->email
+                ]
+            ]);
+        }
+        return response()->json(['error' => 'Unauthorized'], 401);
+
+    }
+
+    /**
+     * Logout response for logout
+     *
+     * @return JsonResponse
+     */
+    public function logout()
+    {
+        auth()->logout();
+        return response()->json([
+            'message' => 'User logout successfully',
+        ]);
+    }
+
+    /**
      * Remove the specified resource from storage.
      * @param $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function destroy($id):JsonResponse
+    public function destroy($id): JsonResponse
     {
         $data = User::find($id);
         $data->delete();
-        return success_message('','Data has been deleted.');
+        return success_message('', 'Data has been deleted.');
     }
 }
